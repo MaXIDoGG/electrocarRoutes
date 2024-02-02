@@ -1,16 +1,16 @@
 import requests
 import networkx as nx
 import osm2geojson
-import momepy
-from shapely.geometry import Polygon
+# import momepy
+# from shapely.geometry import Polygon
 from geopy.distance import geodesic
 import folium
 import geopandas as gpd
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import scipy as sp
-from scipy.spatial import KDTree
-import numpy as np
-import math
+# from scipy.spatial import KDTree
+# import numpy as np
+# import math
 import json
 
 # Начальные и конечные координаты (пример: Москва и Санкт-Петербург)
@@ -28,6 +28,7 @@ def get_roads_in_radius_osm(radius, start_point, end_point):
             node(around: 100, {end_point[0]}, {end_point[1]});
             way[highway=primary](around: {radius},{center_point[0]},{center_point[1]});
             way[highway=secondary](around: {radius},{center_point[0]},{center_point[1]});
+            
         );
         out geom;
     """
@@ -45,6 +46,27 @@ def get_roads_in_radius_osm(radius, start_point, end_point):
         return None
     
 
+def get_charging_stations(radius, start_point, end_point):
+    overpass_url = "https://overpass-api.de/api/interpreter"
+    overpass_query = f"""
+        [out:json];
+        (
+            node[amenity=charging_station](around: {radius},{center_point[0]},{center_point[1]});
+        );
+        out geom;
+    """
+
+    response = requests.get(overpass_url,params={'data': overpass_query})
+
+    if response.status_code == 200:
+        stations = []
+        print(200)
+        data = response.json()
+        for station in data['elements']:
+            stations.append(station)
+    else:
+        return None
+
 # Нахождение ближайшей точки дороги к заданной точке
 def find_nearest_road_point(road_graph, point):
     nearest_point = None
@@ -60,8 +82,7 @@ def find_nearest_road_point(road_graph, point):
 
 def build_graph(file_path, start_point, end_point):
     # Загрузка данных из GeoJSON файла с помощью GeoPandas
-    data = gpd.read_file(file_path) 
-
+    data = gpd.read_file(file_path)
     # Создание пустого графа
     road_graph = nx.Graph()
 
@@ -125,7 +146,8 @@ def visualize_route(route):
 # Радиус для запроса данных о дорогах
 radius = calculate_distance(start_point, end_point) * 800 # В метрах
 # Получение данных о дорогах
-roads_data = get_roads_in_radius_osm(radius, start_point, end_point)
+get_roads_in_radius_osm(radius, start_point, end_point)
+get_charging_stations(radius, start_point, end_point)
 # Построение графа
 road_graph = build_graph("main.json", start_point, end_point)
 # print(road_graph.nodes)
