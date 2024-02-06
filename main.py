@@ -7,19 +7,21 @@ from geopy.distance import geodesic
 import folium
 import geopandas as gpd
 # import matplotlib.pyplot as plt
-import scipy as sp
+# import scipy as sp
 # from scipy.spatial import KDTree
 # import numpy as np
 # import math
 import json
 
 # Начальные и конечные координаты (пример: Москва и Санкт-Петербург)
-start_point = (55.031086, 82.921031)
-end_point = (56.469176, 84.941186)
-center_point = ((start_point[0]+end_point[0])/2, (start_point[1]+end_point[1])/2)
+START_POINT = (55.031086, 82.921031)
+END_POINT = (56.469176, 84.941186)
+CENTER_POINT = ((START_POINT[0] + END_POINT[0]) / 2, (START_POINT[1] + END_POINT[1]) / 2)
+MAX_DISTANCE = 150
+
 
 # Запрос на OSM данных о дарогах в прямоугольнике
-def get_roads_in_radius_osm(radius, start_point, end_point):
+def get_roads_in_radius_osm(radius, start_point, end_point, center_point):
     overpass_url = "https://overpass-api.de/api/interpreter"
     overpass_query = f"""
         [out:json];
@@ -34,7 +36,7 @@ def get_roads_in_radius_osm(radius, start_point, end_point):
     """
 
     # way[highway=tertiary](around: {radius},{center_point[0]},{center_point[1]});
-    response = requests.get(overpass_url,params={'data': overpass_query})
+    response = requests.get(overpass_url, params={'data': overpass_query})
 
     if response.status_code == 200:
         print(200)
@@ -44,9 +46,9 @@ def get_roads_in_radius_osm(radius, start_point, end_point):
             json.dump(data, f, indent=2)
     else:
         return None
-    
 
-def get_charging_stations(radius, start_point, end_point):
+
+def get_charging_stations(radius, center_point):
     overpass_url = "https://overpass-api.de/api/interpreter"
     overpass_query = f"""
         [out:json];
@@ -56,16 +58,21 @@ def get_charging_stations(radius, start_point, end_point):
         out geom;
     """
 
-    response = requests.get(overpass_url,params={'data': overpass_query})
+    response = requests.get(overpass_url, params={'data': overpass_query})
 
     if response.status_code == 200:
         stations = []
         print(200)
         data = response.json()
         for station in data['elements']:
-            stations.append(station)
+            station_coords = (station['lat'], station['lon'])
+            stations.append(station_coords)
+            print(station_coords)
+
+        return stations
     else:
         return None
+
 
 # Нахождение ближайшей точки дороги к заданной точке
 def find_nearest_road_point(road_graph, point):
@@ -80,7 +87,8 @@ def find_nearest_road_point(road_graph, point):
 
     return nearest_point
 
-def build_graph(file_path, start_point, end_point):
+
+def build_graph(file_path, start_point, end_point, stations):
     # Загрузка данных из GeoJSON файла с помощью GeoPandas
     data = gpd.read_file(file_path)
     # Создание пустого графа
@@ -118,45 +126,83 @@ def build_graph(file_path, start_point, end_point):
     distance = geodesic(start_point, nearest_end).kilometers
     road_graph.add_edge(end_point, nearest_end, length=distance)
 
+    for station in stations:
+        nearest_station = find_nearest_road_point(road_graph, station)
+        road_graph.add_node(station)
+        distance = geodesic(station, nearest_station).kilometers
+        road_graph.add_edge(station, nearest_station, length=distance)
+
     return road_graph
+
 
 # Дистанция между вершинами графа
 def calculate_distance(coord1, coord2):
     return geodesic(coord1, coord2).kilometers
 
 
-# Нахождение кратчайшего пути
-def optimize_route(graph, start, end):
-    return nx.shortest_path(graph, source=start, target=end, weight='length')
+def find_nearest_charging_station(point, stations):
+    nearest_station = None
+    min_distance = float('inf')
 
-def visualize_route(route):
+    for station in stations:
+        distance = calculate_distance(point, station)
+        if distance < min_distance:
+            min_distance = distance
+            nearest_station = station
+
+    return nearest_station
+
+
+# Нахождение кратчайшего пути
+def optimize_route(graph, start, end, max_range, stations):
+    route = nx.astar_path(graph, source=start, target=end, weight='length')
+
+    updated_route = [start]
+    current_range = max_range
+
+    for i in range(len(route) - 1):
+        current_node = route[i]
+        next_node = route[i + 1]
+        current_range -= graph[current_node][next_node]['length']
+
+        # Если текущий участок маршрута недостижим без дополнительной зарядки
+        if current_range < 30:
+            nearest_charging_station = find_nearest_charging_station(current_node, stations)
+            updated_route.insert(i+1, nearest_charging_station)
+            current_range = max_range
+
+        next_node = route[i + 1]
+        current_range -= graph[current_node][next_node]['length']
+
+    updated_route.append(end)
+    return updated_route
+
+
+def visualize_route(route, start_point, end_point, center_point, stations):
     map_osm = folium.Map(location=center_point, zoom_start=12)
-    
-    # for i in range(len(route) - 1):
-    #     node1 = route[i]
-    #     node2 = route[i + 1]
-    #     print(node1, " ", node2)
+
     folium.PolyLine(list(route), color="green", weight=5, opacity=1).add_to(map_osm)
-        # i += 2
     folium.CircleMarker(location=(start_point[0], start_point[1]), radius=7, color='blue', fill=False).add_to(map_osm)
     folium.CircleMarker(location=(end_point[0], end_point[1]), radius=7, color='red', fill=False).add_to(map_osm)
+    for station in stations:
+        folium.CircleMarker(location=station, radius=7, color='yellow', fill=False).add_to(
+            map_osm)
+
     map_osm.save('map_with_route.html')
     return map_osm
 
+
 # Радиус для запроса данных о дорогах
-radius = calculate_distance(start_point, end_point) * 800 # В метрах
+radius = calculate_distance(START_POINT, END_POINT) * 800  # В метрах
 # Получение данных о дорогах
-get_roads_in_radius_osm(radius, start_point, end_point)
-get_charging_stations(radius, start_point, end_point)
+get_roads_in_radius_osm(radius, START_POINT, END_POINT, CENTER_POINT)
+charging_stations = get_charging_stations(radius, CENTER_POINT)
 # Построение графа
-road_graph = build_graph("main.json", start_point, end_point)
-# print(road_graph.nodes)
+road_graph = build_graph("main.json", START_POINT, END_POINT, charging_stations)
+
+
 # Применение алгоритма Дейкстры для поиска оптимального маршрута
 
-optimal_route = nx.shortest_path(road_graph, source=start_point, target=end_point, weight='length')
-# print(optimal_route)
+optimal_route = optimize_route(road_graph, START_POINT, END_POINT, MAX_DISTANCE, charging_stations)
 
-map_with_route = visualize_route(optimal_route)
-
-# Сохранение карты в файл (можно использовать для отображения в Jupyter Notebook)
-# map_with_route.save('map_with_route.html')
+map_with_route = visualize_route(optimal_route, START_POINT, END_POINT, CENTER_POINT, charging_stations)
