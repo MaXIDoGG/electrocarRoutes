@@ -1,5 +1,6 @@
 import requests
 import networkx as nx
+from multiprocessing import Process
 import osm2geojson
 # import momepy
 # from shapely.geometry import Polygon
@@ -155,27 +156,13 @@ def find_nearest_charging_station(point, stations):
 
 # Нахождение кратчайшего пути
 def optimize_route(graph, start, end, max_range, stations):
-    route = nx.astar_path(graph, source=start, target=end, weight='length')
-
-    updated_route = [start]
-    current_range = max_range
-
-    for i in range(len(route) - 1):
-        current_node = route[i]
-        next_node = route[i + 1]
-        current_range -= graph[current_node][next_node]['length']
-
-        # Если текущий участок маршрута недостижим без дополнительной зарядки
-        if current_range < 30:
-            nearest_charging_station = find_nearest_charging_station(current_node, stations)
-            updated_route.insert(i+1, nearest_charging_station)
-            current_range = max_range
-
-        next_node = route[i + 1]
-        current_range -= graph[current_node][next_node]['length']
-
-    updated_route.append(end)
-    return updated_route
+    start_station = find_nearest_charging_station(start, stations)
+    end_station = find_nearest_charging_station(end, stations)
+    route1 = nx.astar_path(graph, source=start, target=start_station, weight='length')
+    route2 = nx.astar_path(graph, source=start_station, target=end_station, weight='length')[1:]
+    route3 = nx.astar_path(graph, source=end_station, target=end, weight='length')[1:]
+    route = route1 + route2 + route3
+    return route
 
 
 def visualize_route(route, start_point, end_point, center_point, stations):
@@ -199,7 +186,6 @@ get_roads_in_radius_osm(radius, START_POINT, END_POINT, CENTER_POINT)
 charging_stations = get_charging_stations(radius, CENTER_POINT)
 # Построение графа
 road_graph = build_graph("main.json", START_POINT, END_POINT, charging_stations)
-
 
 # Применение алгоритма Дейкстры для поиска оптимального маршрута
 
