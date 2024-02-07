@@ -16,7 +16,7 @@ import json
 
 # Начальные и конечные координаты (пример: Москва и Санкт-Петербург)
 START_POINT = (55.031086, 82.921031)
-END_POINT = (56.469176, 84.941186)
+END_POINT = (54.957552, 82.942947)
 CENTER_POINT = ((START_POINT[0] + END_POINT[0]) / 2, (START_POINT[1] + END_POINT[1]) / 2)
 MAX_DISTANCE = 150
 
@@ -156,13 +156,25 @@ def find_nearest_charging_station(point, stations):
 
 # Нахождение кратчайшего пути
 def optimize_route(graph, start, end, max_range, stations):
-    start_station = find_nearest_charging_station(start, stations)
-    end_station = find_nearest_charging_station(end, stations)
-    route1 = nx.astar_path(graph, source=start, target=start_station, weight='length')
-    route2 = nx.astar_path(graph, source=start_station, target=end_station, weight='length')[1:]
-    route3 = nx.astar_path(graph, source=end_station, target=end, weight='length')[1:]
-    route = route1 + route2 + route3
-    return route
+    stations_graph = nx.Graph()
+    for station in stations:
+        stations_graph.add_node(station)
+    for i in range(len(stations)):
+        for j in range(i + 1, len(stations)):
+            distance = nx.astar_path_length(graph, stations[i], stations[j])
+            stations_graph.add_edge(stations[i], stations[j], length=distance)
+    print(stations_graph)
+
+    station_start = find_nearest_charging_station(start, stations)
+    station_end = find_nearest_charging_station(end, stations)
+    route1 = nx.astar_path(graph, source=start, target=station_start, weight='length')
+    stations_route = nx.astar_path(stations_graph, source=station_start, target=station_end, weight='length') # вот здесь менять!
+    route2 = []
+    for i in range(len(stations_route)-1):
+        route2 += nx.astar_path(graph, source=stations_route[i], target=stations_route[i+1], weight='length')[1:]
+
+    route3 = nx.astar_path(graph, source=station_end, target=end, weight='length')[1:]
+    return route1 + route2 + route3
 
 
 def visualize_route(route, start_point, end_point, center_point, stations):
