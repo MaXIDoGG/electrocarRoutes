@@ -15,10 +15,11 @@ import geopandas as gpd
 import json
 
 # Начальные и конечные координаты (пример: Москва и Санкт-Петербург)
-START_POINT = (55.031086, 82.921031)
-END_POINT = (54.957552, 82.942947)
+START_POINT = (54.916384, 82.962985)
+END_POINT = (55.038322, 82.942229)
 CENTER_POINT = ((START_POINT[0] + END_POINT[0]) / 2, (START_POINT[1] + END_POINT[1]) / 2)
-MAX_DISTANCE = 150
+print(CENTER_POINT)
+MAX_DISTANCE = 6500
 
 
 # Запрос на OSM данных о дарогах в прямоугольнике
@@ -31,7 +32,6 @@ def get_roads_in_radius_osm(radius, start_point, end_point, center_point):
             node(around: 100, {end_point[0]}, {end_point[1]});
             way[highway=primary](around: {radius},{center_point[0]},{center_point[1]});
             way[highway=secondary](around: {radius},{center_point[0]},{center_point[1]});
-            
         );
         out geom;
     """
@@ -137,8 +137,6 @@ def build_graph(file_path, start_point, end_point, stations):
 
 
 # Дистанция между вершинами графа
-def calculate_distance(coord1, coord2):
-    return geodesic(coord1, coord2).kilometers
 
 
 def find_nearest_charging_station(point, stations):
@@ -156,25 +154,51 @@ def find_nearest_charging_station(point, stations):
 
 # Нахождение кратчайшего пути
 def optimize_route(graph, start, end, max_range, stations):
-    stations_graph = nx.Graph()
-    for station in stations:
-        stations_graph.add_node(station)
-    for i in range(len(stations)):
-        for j in range(i + 1, len(stations)):
-            distance = nx.astar_path_length(graph, stations[i], stations[j])
-            stations_graph.add_edge(stations[i], stations[j], length=distance)
-    print(stations_graph)
+    # stations_graph = nx.Graph()
+    # for station in stations:
+    #     stations_graph.add_node(station)
+    # for i in range(len(stations)):
+    #     for j in range(i + 1, len(stations)):
+    #         distance = nx.astar_path_length(graph, stations[i], stations[j])
+    #         stations_graph.add_edge(stations[i], stations[j], length=distance)
+    #
+    # station_start = find_nearest_charging_station(start, stations)
+    # station_end = find_nearest_charging_station(end, stations)
+    # route1 = nx.astar_path(graph, source=start, target=station_start, weight='length')
+    # stations_route = nx.astar_path(stations_graph, source=station_start, target=station_end, weight='length') # вот здесь менять!
+    # route2 = []
+    # for i in range(len(stations_route)-1):
+    #     route2 += nx.astar_path(graph, source=stations_route[i], target=stations_route[i+1], weight='length')[1:]
+    #
+    # route3 = nx.astar_path(graph, source=station_end, target=end, weight='length')[1:]
+    # return route1 + route2 + route3
+    route = [start]
+    current_point = start
+    while current_point != end:
+        route_to_end = nx.astar_path(graph, source=current_point, target=end, weight='length')[1:]
+        if calc_distance_of_route(route_to_end) < max_range:
+            route += route_to_end
+            break
 
-    station_start = find_nearest_charging_station(start, stations)
-    station_end = find_nearest_charging_station(end, stations)
-    route1 = nx.astar_path(graph, source=start, target=station_start, weight='length')
-    stations_route = nx.astar_path(stations_graph, source=station_start, target=station_end, weight='length') # вот здесь менять!
-    route2 = []
-    for i in range(len(stations_route)-1):
-        route2 += nx.astar_path(graph, source=stations_route[i], target=stations_route[i+1], weight='length')[1:]
+        stationsOnRange = get_charging_stations(max_range, current_point)
+        print("але", max_range, current_point)
+        if len(stationsOnRange) == 0:
+            print("No stations")
+            return None
+        needStation = min(stationsOnRange, key=lambda st: geodesic(st, end).kilometers)
 
-    route3 = nx.astar_path(graph, source=station_end, target=end, weight='length')[1:]
-    return route1 + route2 + route3
+        route += nx.astar_path(graph, source=current_point, target=needStation, weight='length')[1:]
+        current_point = needStation
+        print(route)
+
+    return route
+
+
+def calc_distance_of_route(route):
+    result = 0
+    for i in range(len(route) - 1):
+        result += geodesic(route[i], route[i + 1]).meters
+    return result
 
 
 def visualize_route(route, start_point, end_point, center_point, stations):
@@ -192,15 +216,17 @@ def visualize_route(route, start_point, end_point, center_point, stations):
 
 
 # Радиус для запроса данных о дорогах
-radius = calculate_distance(START_POINT, END_POINT) * 800  # В метрах
+radius = geodesic(START_POINT, END_POINT).meters * 0.8  # В метрах
 # Получение данных о дорогах
 get_roads_in_radius_osm(radius, START_POINT, END_POINT, CENTER_POINT)
 charging_stations = get_charging_stations(radius, CENTER_POINT)
 # Построение графа
 road_graph = build_graph("main.json", START_POINT, END_POINT, charging_stations)
+print(road_graph)
 
 # Применение алгоритма Дейкстры для поиска оптимального маршрута
 
 optimal_route = optimize_route(road_graph, START_POINT, END_POINT, MAX_DISTANCE, charging_stations)
+print(calc_distance_of_route(optimal_route), "meters")
 
 map_with_route = visualize_route(optimal_route, START_POINT, END_POINT, CENTER_POINT, charging_stations)
