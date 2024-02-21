@@ -1,6 +1,5 @@
 import requests
 import networkx as nx
-from multiprocessing import Process
 import osm2geojson
 from geopy.distance import geodesic
 import folium
