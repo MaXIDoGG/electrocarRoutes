@@ -2,21 +2,53 @@ import requests
 import networkx as nx
 from multiprocessing import Process
 import osm2geojson
-# import momepy
-# from shapely.geometry import Polygon
 from geopy.distance import geodesic
 import folium
 import geopandas as gpd
-# import matplotlib.pyplot as plt
-# import scipy as sp
 from scipy.spatial import KDTree
-# import numpy as np
-# import math
 import json
+import tkinter as tk
+
+start_lat, start_lon = None, None
+end_lat, end_lon = None, None
+
+def get_coordinates():
+    global start_lat, start_lon
+    global end_lat, end_lon
+    start_lat = float(entry_start_lat.get())
+    start_lon = float(entry_start_lon.get())
+    end_lat = float(entry_end_lat.get())
+    end_lon = float(entry_end_lon.get())
+    start_point = (start_lat, start_lon)
+    end_point = (end_lat, end_lon)
+    root.destroy()
+    return start_point, end_point
+
+root = tk.Tk()
+root.title("Введите координаты")
+
+tk.Label(root, text="Начальная широта:").grid(row=0, column=0)
+tk.Label(root, text="Начальная долгота:").grid(row=1, column=0)
+tk.Label(root, text="Конечная широта:").grid(row=2, column=0)
+tk.Label(root, text="Конечная долгота:").grid(row=3, column=0)
+
+entry_start_lat = tk.Entry(root)
+entry_start_lat.grid(row=0, column=1)
+entry_start_lon = tk.Entry(root)
+entry_start_lon.grid(row=1, column=1)
+entry_end_lat = tk.Entry(root)
+entry_end_lat.grid(row=2, column=1)
+entry_end_lon = tk.Entry(root)
+entry_end_lon.grid(row=3, column=1)
+
+tk.Button(root, text="OK", command=get_coordinates).grid(row=4, columnspan=2)
+
+root.mainloop()
+
 
 # Начальные и конечные координаты (пример: Москва и Санкт-Петербург)
-START_POINT = (54.916267, 82.963470)
-END_POINT = (55.038322, 82.942229)
+START_POINT = (start_lat, start_lon)
+END_POINT = (end_lat, end_lon)
 CENTER_POINT = ((START_POINT[0] + END_POINT[0]) / 2, (START_POINT[1] + END_POINT[1]) / 2)
 MAX_DISTANCE = 6500
 
