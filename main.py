@@ -39,36 +39,36 @@ def get_coordinates():
         messagebox.showerror("Ошибка", "Некорректные данные")
         return None, None, None
 
-root = tk.Tk()
-root.title("Введите координаты")
+# root = tk.Tk()
+# root.title("Введите координаты")
 
-tk.Label(root, text="Начальная широта:").grid(row=0, column=0)
-tk.Label(root, text="Начальная долгота:").grid(row=1, column=0)
-tk.Label(root, text="Конечная широта:").grid(row=2, column=0)
-tk.Label(root, text="Конечная долгота:").grid(row=3, column=0)
-tk.Label(root, text="Максимальное расстояние (м):").grid(row=4, column=0)
+# tk.Label(root, text="Начальная широта:").grid(row=0, column=0)
+# tk.Label(root, text="Начальная долгота:").grid(row=1, column=0)
+# tk.Label(root, text="Конечная широта:").grid(row=2, column=0)
+# tk.Label(root, text="Конечная долгота:").grid(row=3, column=0)
+# tk.Label(root, text="Максимальное расстояние (м):").grid(row=4, column=0)
 
-entry_start_lat = tk.Entry(root)
-entry_start_lat.grid(row=0, column=1)
-entry_start_lon = tk.Entry(root)
-entry_start_lon.grid(row=1, column=1)
-entry_end_lat = tk.Entry(root)
-entry_end_lat.grid(row=2, column=1)
-entry_end_lon = tk.Entry(root)
-entry_end_lon.grid(row=3, column=1)
-entry_max_distance = tk.Entry(root)
-entry_max_distance.grid(row=4, column=1)
+# entry_start_lat = tk.Entry(root)
+# entry_start_lat.grid(row=0, column=1)
+# entry_start_lon = tk.Entry(root)
+# entry_start_lon.grid(row=1, column=1)
+# entry_end_lat = tk.Entry(root)
+# entry_end_lat.grid(row=2, column=1)
+# entry_end_lon = tk.Entry(root)
+# entry_end_lon.grid(row=3, column=1)
+# entry_max_distance = tk.Entry(root)
+# entry_max_distance.grid(row=4, column=1)
 
-tk.Button(root, text="OK", command=get_coordinates).grid(row=5, columnspan=2)
+# tk.Button(root, text="OK", command=get_coordinates).grid(row=5, columnspan=2)
 
-root.mainloop()
+# root.mainloop()
 
-if start_lat is None or start_lon is None or end_lat is None or end_lon is None or MAX_DISTANCE is None:
-    exit()
+# if start_lat is None or start_lon is None or end_lat is None or end_lon is None or MAX_DISTANCE is None:
+#     exit()
 
 # Начальные и конечные координаты
-START_POINT = (start_lat, start_lon)
-END_POINT = (end_lat, end_lon)
+START_POINT = (54.916267, 82.963470)
+END_POINT = (55.038322, 82.942229)
 CENTER_POINT = ((START_POINT[0] + END_POINT[0]) / 2, (START_POINT[1] + END_POINT[1]) / 2)
 
 def get_roads_in_radius_osm(radius, start_point, end_point, center_point):
@@ -219,8 +219,9 @@ get_roads_in_radius_osm(radius, START_POINT, END_POINT, CENTER_POINT)
 charging_stations = get_charging_stations(radius, CENTER_POINT)
 
 road_graph = build_graph("main.json", START_POINT, END_POINT, charging_stations)
-optimal_route = optimize_route(road_graph, START_POINT, END_POINT, MAX_DISTANCE)
-if optimal_route == None:
-    messagebox.showerror("Ошибка", "Невозможно построить кратчайший путь.")
-    exit()
-map_with_route = visualize_route(optimal_route, START_POINT, END_POINT, CENTER_POINT, charging_stations)
+print(road_graph.nodes)
+# optimal_route = optimize_route(road_graph, START_POINT, END_POINT, MAX_DISTANCE)
+# if optimal_route == None:
+#     messagebox.showerror("Ошибка", "Невозможно построить кратчайший путь.")
+#     exit()
+# map_with_route = visualize_route(optimal_route, START_POINT, END_POINT, CENTER_POINT, charging_stations)
