@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+requests
+networkx
+osm2geojson
+geopy
+folium
+geopandas
+scipy
