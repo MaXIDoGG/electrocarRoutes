@@ -133,11 +133,7 @@
 			})
 				.then(response => response.json())
 				.then(data => {
-					console.log(data)
-					console.log(data.route)
 					var route = JSON.parse(data).route;
-					console.log(route)
-
 
 					var latLngs = route.map(function (point) {
 						return L.latLng(point[0], point[1]);
