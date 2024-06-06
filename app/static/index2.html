@@ -2,177 +2,191 @@
 <html lang="en">
 
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Electric Car Route Finder</title>
-	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-	<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-	<style>
-		#map {
-			height: 600px;
-			width: 100%;
-			margin-top: 20px;
-		}
-	</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electric Car Route Finder</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 600px;
+            width: 100%;
+            margin-top: 20px;
+        }
+    </style>
 </head>
 
 <body>
-	<div class="container">
-		<h1 class="mt-5">Electric Car Route Finder</h1>
-		<form class="mt-4">
-			<div class="form-row">
-				<div class="form-group col-md-6">
-					<label for="startLat">Start Latitude:</label>
-					<input type="text" class="form-control" id="startLat">
-				</div>
-				<div class="form-group col-md-6">
-					<label for="startLon">Start Longitude:</label>
-					<input type="text" class="form-control" id="startLon">
-				</div>
-			</div>
-			<div class="form-row">
-				<div class="form-group col-md-6">
-					<label for="endLat">End Latitude:</label>
-					<input type="text" class="form-control" id="endLat">
-				</div>
-				<div class="form-group col-md-6">
-					<label for="endLon">End Longitude:</label>
-					<input type="text" class="form-control" id="endLon">
-				</div>
-			</div>
-			<div class="form-row">
-				<div class="form-group col-md-6">
-					<label for="maxDistance">Max Distance (meters):</label>
-					<input type="text" class="form-control" id="maxDistance">
-				</div>
-			</div>
-			<button type="button" class="btn btn-primary" onclick="findRoute()">Find Route</button>
-			<button type="button" class="btn btn-danger ml-2" onclick="clearMarkers()">Clear Markers</button>
-		</form>
-		<div id="map"></div>
-	</div>
+    <div class="container">
+        <h1 class="mt-5">Electric Car Route Finder</h1>
+        <form class="mt-4">
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="startLat">Start Latitude:</label>
+                    <input type="text" class="form-control" id="startLat">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="startLon">Start Longitude:</label>
+                    <input type="text" class="form-control" id="startLon">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="endLat">End Latitude:</label>
+                    <input type="text" class="form-control" id="endLat">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="endLon">End Longitude:</label>
+                    <input type="text" class="form-control" id="endLon">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="maxDistance">Max Distance (meters):</label>
+                    <input type="text" class="form-control" id="maxDistance">
+                </div>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="findRoute()">Find Route</button>
+            <button type="button" class="btn btn-danger ml-2" onclick="clearMarkers()">Clear Markers</button>
+        </form>
+        <div id="map"></div>
+    </div>
 
-	<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-	<script>
-		var map = L.map('map').setView([55.038322, 82.942229], 13); // Начальные координаты и уровень масштабирования
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        var map = L.map('map').setView([55.038322, 82.942229], 13); // Initial coordinates and zoom level
 
-		L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-			maxZoom: 19,
-		}).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+        }).addTo(map);
 
-		var startLatInput = document.getElementById('startLat');
-		var startLonInput = document.getElementById('startLon');
-		var endLatInput = document.getElementById('endLat');
-		var endLonInput = document.getElementById('endLon');
-		var maxMarkers = 2;
-		var startMarker, endMarker;
+        var startLatInput = document.getElementById('startLat');
+        var startLonInput = document.getElementById('startLon');
+        var endLatInput = document.getElementById('endLat');
+        var endLonInput = document.getElementById('endLon');
+        var maxMarkers = 2;
+        var startMarker, endMarker;
+        var routePolyline = null;
 
-		map.on('click', function (e) {
-			if (startMarker && endMarker) {
-				return; // ограничиваем количество меток
-			}
+        map.on('click', function (e) {
+            if (startMarker && endMarker) {
+                return; // Limit the number of markers
+            }
 
-			var lat = e.latlng.lat.toFixed(6);
-			var lon = e.latlng.lng.toFixed(6);
+            var lat = e.latlng.lat.toFixed(6);
+            var lon = e.latlng.lng.toFixed(6);
 
-			var markerColor = startMarker ? 'red' : 'blue'; // определение цвета маркера
+            var markerColor = startMarker ? 'red' : 'blue'; // Determine marker color
 
-			var marker = L.marker([lat, lon], { icon: coloredIcon(markerColor) }).addTo(map);
-			if (!startMarker) {
-				startMarker = marker;
-				startLatInput.value = lat;
-				startLonInput.value = lon;
-			} else {
-				endMarker = marker;
-				endLatInput.value = lat;
-				endLonInput.value = lon;
-			}
+            var marker = L.marker([lat, lon], { icon: coloredIcon(markerColor) }).addTo(map);
+            if (!startMarker) {
+                startMarker = marker;
+                startLatInput.value = lat;
+                startLonInput.value = lon;
+            } else {
+                endMarker = marker;
+                endLatInput.value = lat;
+                endLonInput.value = lon;
+            }
 
-			// Обработчик для удаления маркера по правому клику
-			marker.on('contextmenu', function (e) {
-				map.removeLayer(marker);
+            // Handler for removing marker on right click
+            marker.on('contextmenu', function (e) {
+                map.removeLayer(marker);
 				if (marker === startMarker) {
-					startMarker = null;
-					startLatInput.value = '';
-					startLonInput.value = '';
-				} else if (marker === endMarker) {
-					endMarker = null;
-					endLatInput.value = '';
-					endLonInput.value = '';
-				}
-			});
-		});
+                    startMarker = null;
+                    startLatInput.value = '';
+                    startLonInput.value = '';
+                } else if (marker === endMarker) {
+                    endMarker = null;
+                    endLatInput.value = '';
+                    endLonInput.value = '';
+                }
+                // Remove existing route if markers are less than 2
+                if (routePolyline) {
+                    map.removeLayer(routePolyline);
+                    routePolyline = null;
+                }
+            });
+        });
 
-		function findRoute() {
-			if (!startMarker || !endMarker) {
-				alert("Please set both start and end points.");
-				return;
-			}
+        function findRoute() {
+            if (!startMarker || !endMarker) {
+                alert("Please set both start and end points.");
+                return;
+            }
 
-			var startLat = parseFloat(startLatInput.value);
-			var startLon = parseFloat(startLonInput.value);
-			var endLat = parseFloat(endLatInput.value);
-			var endLon = parseFloat(endLonInput.value);
-			var maxDistance = parseInt(document.getElementById('maxDistance').value);
+            var startLat = parseFloat(startLatInput.value);
+            var startLon = parseFloat(startLonInput.value);
+            var endLat = parseFloat(endLatInput.value);
+            var endLon = parseFloat(endLonInput.value);
+            var maxDistance = parseInt(document.getElementById('maxDistance').value);
 
-			var requestData = {
-				start_lat: startLat,
-				start_lon: startLon,
-				end_lat: endLat,
-				end_lon: endLon,
-				max_distance: maxDistance
-			};
+            var requestData = {
+                start_lat: startLat,
+                start_lon: startLon,
+                end_lat: endLat,
+                end_lon: endLon,
+                max_distance: maxDistance
+            };
 
-			fetch('http://127.0.0.1:8000/route', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(requestData)
-			})
-				.then(response => response.json())
-				.then(data => {
-					var route = JSON.parse(data).route;
+            fetch('http://127.0.0.1:8000/route', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    var route = JSON.parse(data).route;
 
-					var latLngs = route.map(function (point) {
-						return L.latLng(point[0], point[1]);
-					});
+                    var latLngs = route.map(function (point) {
+                        return L.latLng(point[0], point[1]);
+                    });
 
-					var polyline = L.polyline(latLngs, { color: 'red' }).addTo(map);
-					map.fitBounds(polyline.getBounds());
-				})
-				.catch(error => {
-					console.error('Error:', error);
-				});
-		}
+                    if (routePolyline) {
+                        map.removeLayer(routePolyline);
+                    }
 
-		function clearMarkers() {
-			if (startMarker) {
-				map.removeLayer(startMarker);
-				startMarker = null;
-				startLatInput.value = '';
-				startLonInput.value = '';
-			}
-			if (endMarker) {
-				map.removeLayer(endMarker);
-				endMarker = null;
-				endLatInput.value = '';
-				endLonInput.value = '';
-			}
-		}
+                    routePolyline = L.polyline(latLngs, { color: 'red' }).addTo(map);
+                    map.fitBounds(routePolyline.getBounds());
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
 
-		function coloredIcon(color) {
-			return new L.Icon({
-				iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-				shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-				iconSize: [25, 41],
-				iconAnchor: [12, 41],
-				popupAnchor: [1, -34],
-				shadowSize: [41, 41]
-			});
-		}
-	</script>
+        function clearMarkers() {
+            if (startMarker) {
+                map.removeLayer(startMarker);
+                startMarker = null;
+                startLatInput.value = '';
+                startLonInput.value = '';
+            }
+            if (endMarker) {
+                map.removeLayer(endMarker);
+                endMarker = null;
+                endLatInput.value = '';
+                endLonInput.value = '';
+            }
+            if (routePolyline) {
+                map.removeLayer(routePolyline);
+                routePolyline = null;
+            }
+        }
+
+        function coloredIcon(color) {
+            return new L.Icon({
+                iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            });
+        }
+    </script>
 </body>
 
 </html>

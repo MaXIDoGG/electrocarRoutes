@@ -42,6 +42,8 @@ async def get_roads_in_radius_osm(radius, start_point, end_point, center_point):
         "service",
         "trunk",
         "unclassified",
+        "residental",
+        "motorway"
     ]
     responses = await asyncio.gather(
         *[fetch_roads(highway_type) for highway_type in highway_types]
@@ -89,7 +91,7 @@ def find_nearest_road_point(road_graph, point):
 
 def build_graph(file_path, start_point, end_point, stations):
     data = gpd.read_file(file_path)
-    road_graph = nx.Graph()
+    road_graph = nx.DiGraph()
 
     for _, road in data.iterrows():
         road_geometry = road.geometry
@@ -102,27 +104,38 @@ def build_graph(file_path, start_point, end_point, stations):
         else:
             continue
 
+        oneway = road['tags'].get('oneway', 'no')
         for i in range(len(road_coordinates) - 1):
             start = tuple(reversed(road_coordinates[i]))
             end = tuple(reversed(road_coordinates[i + 1]))
             distance = geodesic(start, end).meters
-            road_graph.add_edge(start, end, length=distance)
+            if oneway == 'yes':
+                road_graph.add_edge(start, end, length=distance)
+            else:
+                road_graph.add_edge(start, end, length=distance)
+                road_graph.add_edge(end, start, length=distance)
 
+    # Connect start_point to the nearest road point
     nearest_start = find_nearest_road_point(road_graph, start_point)
     road_graph.add_node(start_point)
     distance = geodesic(start_point, nearest_start).meters
     road_graph.add_edge(start_point, nearest_start, length=distance)
+    road_graph.add_edge(nearest_start, start_point, length=distance)
 
+    # Connect end_point to the nearest road point
     nearest_end = find_nearest_road_point(road_graph, end_point)
     road_graph.add_node(end_point)
-    distance = geodesic(start_point, nearest_end).meters
+    distance = geodesic(end_point, nearest_end).meters
     road_graph.add_edge(end_point, nearest_end, length=distance)
+    road_graph.add_edge(nearest_end, end_point, length=distance)
 
+    # Connect charging stations to the nearest road points
     for station in stations:
         nearest_station = find_nearest_road_point(road_graph, station)
         road_graph.add_node(station)
         distance = geodesic(station, nearest_station).meters
         road_graph.add_edge(station, nearest_station, length=distance)
+        road_graph.add_edge(nearest_station, station, length=distance)
 
     return road_graph
 
@@ -144,22 +157,32 @@ def optimize_route(graph, start, end, max_range):
     route = [start]
     current_point = start
     while current_point != end:
-        route_to_end = nx.astar_path(
-            graph, source=current_point, target=end, weight="length"
-        )[1:]
-        if calc_distance_of_route(route_to_end) < max_range:
+        try:
+            route_to_end = nx.shortest_path(
+                graph, source=current_point, target=end, weight="length"
+            )[1:]
+        except nx.NetworkXNoPath:
+            return None
+
+        if calc_distance_of_route(route + route_to_end) <= max_range:
             route += route_to_end
             break
 
-        stations_on_range = get_charging_stations(max_range, current_point)
-        if len(stations_on_range) == 0:
+        stations_on_range = [
+            station for station in graph.nodes
+            if station != current_point and station != end and
+               calc_distance_of_route(route + [station]) <= max_range
+        ]
+        
+        if not stations_on_range:
             return None
-        need_station = min(stations_on_range, key=lambda st: geodesic(st, end).meters)
-
-        route += nx.astar_path(
-            graph, source=current_point, target=need_station, weight="length"
+        
+        nearest_station = min(stations_on_range, key=lambda station: geodesic(station, end).meters)
+        
+        route += nx.shortest_path(
+            graph, source=current_point, target=nearest_station, weight="length"
         )[1:]
-        current_point = need_station
+        current_point = nearest_station
 
     return route
 
@@ -189,6 +212,6 @@ async def process_route(coords):
     )
 
     if optimal_route is None:
-        raise Exception("Невозможно построить кратчайший путь.")
+        print("Невозможно построить кратчайший путь.")
 
     return ujson.dumps({"route": optimal_route})
