@@ -152,41 +152,6 @@ def find_nearest_charging_station(point, stations):
 
     return nearest_station
 
-
-# def optimize_route(graph, start, end, max_range, stations_on_range):
-#     route = [start]
-#     current_point = start
-#     visited_stations = set()
-
-#     while current_point != end:
-#         try:
-#             route_to_end = nx.astar_path(graph, source=current_point, target=end, weight="length")[1:]
-#         except nx.NetworkXNoPath:
-#             return None
-
-#         if calc_distance_of_route(route_to_end) < max_range:
-#             route += route_to_end
-#             break
-        
-#         stations_on_range = [station for station in stations_on_range if station not in visited_stations]
-#         if not stations_on_range:
-#             return None
-        
-#         nearest_station = min(stations_on_range, key=lambda station: geodesic(end, station).meters)
-
-#         if calc_distance_of_route([current_point, nearest_station]) > max_range:
-#             nearest_station = min(stations_on_range, key=lambda station: geodesic(current_point, station).meters)
-            
-#         try:
-#             route_segment = nx.astar_path(graph, source=current_point, target=nearest_station, weight="length")[1:]
-#             route += route_segment
-#             current_point = nearest_station
-#             visited_stations.add(current_point)
-#         except nx.NetworkXNoPath:
-#             return None
-        
-#     return route
-
 def optimize_route(graph, start, end, max_range, stations_on_range):
     route = [start]
     current_point = start
