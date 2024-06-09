@@ -198,6 +198,7 @@ def optimize_route(graph, start, end, max_range, stations_on_range):
         try:
             route_to_end = nx.astar_path(graph, source=current_point, target=end, weight="length")[1:]
         except nx.NetworkXNoPath:
+            print("Error with route")
             return None
 
         while max_range > 0:
@@ -206,6 +207,9 @@ def optimize_route(graph, start, end, max_range, stations_on_range):
                 i += 1
                 route += [route_to_end[i]]
                 current_point = route_to_end[i]
+                nearest_station = min(stations_on_range, key=lambda station: calc_distance_of_route(nx.astar_path(graph, source=current_point, target=station, weight="length")))
+                if max_range - calc_distance_of_route(nx.astar_path(graph, source=current_point, target=nearest_station, weight="length")) < (max_range / 10) or calc_distance_of_route(nx.astar_path(graph, source=current_point, target=nearest_station, weight="length")) < (max_range / 15) or (calc_distance_of_route(route_to_end) - calc_distance_of_route(route)) > max_range:
+                    break
             else:
                 current_point = route_to_end[i]
                 break
@@ -213,8 +217,8 @@ def optimize_route(graph, start, end, max_range, stations_on_range):
         if current_point != end:
             stations_on_range = [station for station in stations_on_range if station not in visited_stations]
             if not stations_on_range:
+                print("No stations")
                 return None
-            nearest_station = min(stations_on_range, key=lambda station: geodesic(current_point, station).meters)
                 
             try:
                 route_segment = nx.astar_path(graph, source=current_point, target=nearest_station, weight="length")[1:]
@@ -224,6 +228,7 @@ def optimize_route(graph, start, end, max_range, stations_on_range):
                 i = 0
                 visited_stations.add(current_point)
             except nx.NetworkXNoPath:
+                print("Error with stations")
                 return None
         
     return route
@@ -246,7 +251,9 @@ async def process_points(coords):
 
     await get_roads_in_radius_osm(radius, start_point, end_point, center_point)
     charging_stations = get_charging_stations(radius, center_point)
+    print("Requst")
     road_graph = build_graph("main.json", start_point, end_point, charging_stations)
+    print("Graph")
 
     optimal_route = optimize_route(road_graph, start_point, end_point, int(coords.max_distance), charging_stations)
 
