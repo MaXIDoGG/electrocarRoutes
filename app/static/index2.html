@@ -68,6 +68,7 @@
         var maxMarkers = 2;
         var startMarker, endMarker;
         var routePolyline = null;
+        var stationMarkers = [];
 
         map.on('click', function (e) {
             if (startMarker && endMarker) {
@@ -89,11 +90,11 @@
                 endLatInput.value = lat;
                 endLonInput.value = lon;
             }
-
+            
             // Handler for removing marker on right click
             marker.on('contextmenu', function (e) {
                 map.removeLayer(marker);
-				if (marker === startMarker) {
+                if (marker === startMarker) {
                     startMarker = null;
                     startLatInput.value = '';
                     startLonInput.value = '';
@@ -107,10 +108,7 @@
                     map.removeLayer(routePolyline);
                     routePolyline = null;
                 }
-                if (stations) {
-                    map.removeLayer(stations);
-                    stations = null;
-                }
+                clearStationMarkers();
             });
         });
 
@@ -145,21 +143,23 @@
                 .then(data => {
                     var route = JSON.parse(data).route;
                     var stations = JSON.parse(data).stations;
+
                     var latLngs = route.map(function (point) {
                         return L.latLng(point[0], point[1]);
                     });
 
-                    var latLngsSt = stations.map(function (point) {
-                        return L.latLng(point[0], point[1]);
-                    });
                     if (routePolyline) {
                         map.removeLayer(routePolyline);
-                        map.removeLayer(stationsPoint)
                     }
 
                     routePolyline = L.polyline(latLngs, { color: 'red' }).addTo(map);
-                    stationsPoint = L.pointMarker(latLngsSt, { color: 'green' }).addTo(map);
-                    map.fitBounds(routePolyline.getBounds(), stations.getBounds());
+                    map.fitBounds(routePolyline.getBounds());
+
+                    clearStationMarkers();
+                    stations.forEach(function (station) {
+                        var marker = L.marker([station[0], station[1]], { icon: coloredIcon('Yellow') }).addTo(map);
+                        stationMarkers.push(marker);
+                    });
                 })
                 .catch(error => {
                     console.error('Error:', error);
@@ -183,6 +183,14 @@
                 map.removeLayer(routePolyline);
                 routePolyline = null;
             }
+            clearStationMarkers();
+        }
+
+        function clearStationMarkers() {
+            stationMarkers.forEach(function (marker) {
+                map.removeLayer(marker);
+            });
+            stationMarkers = [];
         }
 
         function coloredIcon(color) {

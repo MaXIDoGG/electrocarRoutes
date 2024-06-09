@@ -153,33 +153,79 @@ def find_nearest_charging_station(point, stations):
     return nearest_station
 
 
-def optimize_route(graph, start, end, max_range):
+# def optimize_route(graph, start, end, max_range, stations_on_range):
+#     route = [start]
+#     current_point = start
+#     visited_stations = set()
+
+#     while current_point != end:
+#         try:
+#             route_to_end = nx.astar_path(graph, source=current_point, target=end, weight="length")[1:]
+#         except nx.NetworkXNoPath:
+#             return None
+
+#         if calc_distance_of_route(route_to_end) < max_range:
+#             route += route_to_end
+#             break
+        
+#         stations_on_range = [station for station in stations_on_range if station not in visited_stations]
+#         if not stations_on_range:
+#             return None
+        
+#         nearest_station = min(stations_on_range, key=lambda station: geodesic(end, station).meters)
+
+#         if calc_distance_of_route([current_point, nearest_station]) > max_range:
+#             nearest_station = min(stations_on_range, key=lambda station: geodesic(current_point, station).meters)
+            
+#         try:
+#             route_segment = nx.astar_path(graph, source=current_point, target=nearest_station, weight="length")[1:]
+#             route += route_segment
+#             current_point = nearest_station
+#             visited_stations.add(current_point)
+#         except nx.NetworkXNoPath:
+#             return None
+        
+#     return route
+
+def optimize_route(graph, start, end, max_range, stations_on_range):
     route = [start]
     current_point = start
-    buff = []
-    stations_on_range = []
+    visited_stations = set()
+    old_range = max_range
+    i = 0
+
     while current_point != end:
         try:
-            route_to_end = nx.shortest_path(graph, source=current_point, target=end, weight="length")[1:]
+            route_to_end = nx.astar_path(graph, source=current_point, target=end, weight="length")[1:]
         except nx.NetworkXNoPath:
             return None
-        
-        if calc_distance_of_route(route + route_to_end) <= max_range:
-            route += route_to_end
-            break
-        
-        if len(stations_on_range) == 0:
-            stations_on_range = get_charging_stations(max_range, current_point)
-    
-        nearest_station = min(stations_on_range, key=lambda station: geodesic(station, end).meters)
-        
-        try:
-            route += nx.shortest_path(graph, source=current_point, target=nearest_station, weight="length")[1:]
-        except nx.NetworkXNoPath:
-            return None
-        current_point = nearest_station
-        print("??????")
 
+        while max_range > 0:
+            if route_to_end[i] != end:
+                max_range -= calc_distance_of_route([route_to_end[i], route_to_end[i + 1]])
+                i += 1
+                route += [route_to_end[i]]
+                current_point = route_to_end[i]
+            else:
+                current_point = route_to_end[i]
+                break
+        
+        if current_point != end:
+            stations_on_range = [station for station in stations_on_range if station not in visited_stations]
+            if not stations_on_range:
+                return None
+            nearest_station = min(stations_on_range, key=lambda station: geodesic(current_point, station).meters)
+                
+            try:
+                route_segment = nx.astar_path(graph, source=current_point, target=nearest_station, weight="length")[1:]
+                route += route_segment
+                current_point = nearest_station
+                max_range = old_range
+                i = 0
+                visited_stations.add(current_point)
+            except nx.NetworkXNoPath:
+                return None
+        
     return route
 
 
@@ -195,18 +241,18 @@ async def process_points(coords):
     end_point = (coords.end_lat, coords.end_lon)
     center_point = (
         (start_point[0] + end_point[0]) / 2,
-        (start_point[1] + end_point[1]) / 2,
-    )
+        (start_point[1] + end_point[1]) / 2)
     radius = geodesic(start_point, end_point).meters * 0.7
 
     await get_roads_in_radius_osm(radius, start_point, end_point, center_point)
     charging_stations = get_charging_stations(radius, center_point)
     road_graph = build_graph("main.json", start_point, end_point, charging_stations)
 
-    optimal_route = optimize_route(road_graph, start_point, end_point, coords.max_distance)
+    optimal_route = optimize_route(road_graph, start_point, end_point, int(coords.max_distance), charging_stations)
 
     if optimal_route is None:
         print("Невозможно построить кратчайший путь.")
 
+    print(calc_distance_of_route(optimal_route) / 1000, "km")
     return ujson.dumps({"route": optimal_route, 
                         "stations": charging_stations})
