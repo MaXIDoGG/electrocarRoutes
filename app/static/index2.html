@@ -107,6 +107,10 @@
                     map.removeLayer(routePolyline);
                     routePolyline = null;
                 }
+                if (stations) {
+                    map.removeLayer(stations);
+                    stations = null;
+                }
             });
         });
 
@@ -130,7 +134,7 @@
                 max_distance: maxDistance
             };
 
-            fetch('http://127.0.0.1:8000/route', {
+            fetch('http://127.0.0.1:8000/points', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -140,17 +144,22 @@
                 .then(response => response.json())
                 .then(data => {
                     var route = JSON.parse(data).route;
-
+                    var stations = JSON.parse(data).stations;
                     var latLngs = route.map(function (point) {
                         return L.latLng(point[0], point[1]);
                     });
 
+                    var latLngsSt = stations.map(function (point) {
+                        return L.latLng(point[0], point[1]);
+                    });
                     if (routePolyline) {
                         map.removeLayer(routePolyline);
+                        map.removeLayer(stationsPoint)
                     }
 
                     routePolyline = L.polyline(latLngs, { color: 'red' }).addTo(map);
-                    map.fitBounds(routePolyline.getBounds());
+                    stationsPoint = L.pointMarker(latLngsSt, { color: 'green' }).addTo(map);
+                    map.fitBounds(routePolyline.getBounds(), stations.getBounds());
                 })
                 .catch(error => {
                     console.error('Error:', error);

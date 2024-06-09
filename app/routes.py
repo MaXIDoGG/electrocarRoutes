@@ -1,14 +1,14 @@
 from fastapi import APIRouter, HTTPException
 from app.models import Coordinates
-from app.services import process_route
+from app.services import process_points
 
 router = APIRouter()
 
 
-@router.post("/route")
-async def get_route(coords: Coordinates):
+@router.post("/points")
+async def get_points(coords: Coordinates):
     try:
-        route_data = await process_route(coords)
-        return route_data
+        points_data = await process_points(coords)
+        return points_data
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
